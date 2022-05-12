@@ -72,19 +72,38 @@ grid = CanvasGrid(agent_portrayal, MODEL_WIDTH, MODEL_HEIGHT, MODEL_WIDTH * 50, 
 #                       "Color": "Black"}],
 #                     data_collector_name='datacollector')
 
-UserSettableParameter('slider', 'Spawn Chance', value=0.3, min_value=0, max_value=1, step=0.01)
-UserSettableParameter('slider', 'Spawn Chance', value=0.3, min_value=0, max_value=1, step=0.01)
+UserSettableParameter('slider', 'Red Chance', value=0.3, min_value=0, max_value=1, step=0.01)
+UserSettableParameter('slider', 'Blue Chance', value=0.3, min_value=0, max_value=1, step=0.01)
+
+chart1 = ChartModule([{"Label": "total_population",
+                       "Color": "Black"},
+                      {"Label": "G1_population",
+                       "Color": "Red"},
+                      {"Label": "G2_population",
+                       "Color": "Green"},
+                      {"Label": "G3_population",
+                       "Color": "Blue"}
+                      ],
+                     data_collector_name='datacollector')
+
+chart2 = ChartModule([{"Label": "current_population",
+                       "Color": "gray"}],
+                     data_collector_name='datacollector')
 
 server = ModularServer(AisleModel,
-                       [grid],
+                       [grid, chart1, chart2],
                        "Supermarket model",
                        {
-                           "N": UserSettableParameter('slider', 'Customer N', value=100, min_value=1, max_value=200,
+                           "n": UserSettableParameter('slider', 'Customer n', value=100, min_value=1, max_value=200,
                                                       step=1),
                            "width": MODEL_WIDTH,
                            "height": MODEL_HEIGHT,
-                           "spawn_chance": UserSettableParameter('slider', 'Spawn Chance', value=0.3, min_value=0, max_value=1,
-                                                      step=0.01),
+                           "spawn_chance": UserSettableParameter('slider', 'Spawn Chance', value=0.3, min_value=0,
+                                                                 max_value=1,
+                                                                 step=0.01),
+                           "shelf_config": [0, 3, 3, 3, 1, 1, 1, 2, 2, 2, 0],
+                           "probability_table": [0.7, 0.2, 0.1],
+                           "seed": 0,
                        })
 
 server.port = 8521  # The default

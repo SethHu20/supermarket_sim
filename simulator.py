@@ -1,12 +1,10 @@
-from mesa import Agent, Model
-from mesa.time import RandomActivation, BaseScheduler
-from mesa.space import MultiGrid, SingleGrid
-from mesa.datacollection import DataCollector
-from matplotlib.colors import ListedColormap
-from mesa import batchrunner
 import matplotlib.pyplot as plt
 import numpy as np
-import seaborn
+from matplotlib.colors import ListedColormap
+from mesa import Agent, Model
+from mesa.datacollection import DataCollector
+from mesa.space import SingleGrid, Coordinate
+from mesa.time import RandomActivation
 
 
 class WallAgent(Agent):
@@ -21,28 +19,35 @@ class CustomerAgent(Agent):
     def __init__(self, unique_id, model, demand_type):
         super().__init__(unique_id, model)
         self.demand = demand_type
+        self.age = 0
 
     def step(self) -> None:
         self.model: AisleModel
-        move_list = []
         if self.demand != 0:
             for neighbour in self.model.grid.get_neighbors(self.pos, False, ):
                 if isinstance(neighbour, WallAgent):
                     if neighbour.type == self.demand:
                         self.demand = 0
+                        break
             x, y = self.pos
             x: int
             y: int
-            if self.model.grid.is_cell_empty((x, y-1)):
-                self.model.grid.move_agent(self, (x, y-1))
-            elif self.model.grid.is_cell_empty((x+1, y)):
-                self.model.grid.move_agent(self, (x+1, y))
-            else:
-                self.model.grid.move_to_empty(self)
+            if self.demand != 0:
+                direction = self.model.direction_of_shelf(self.pos, self.demand)
+                if self.model.grid.is_cell_empty((x, y-1)):
+                    self.model.grid.move_agent(self, (x, y-1))
+                elif self.model.grid.is_cell_empty((x+direction, y)):
+                    self.model.grid.move_agent(self, (x+direction, y))
+                else:
+                    self.maybe_move_somewhere()
         elif self.demand == 0:
             if self.pos in self.model.exit:
                 self.model.grid.remove_agent(self)
                 self.model.schedule.remove(self)
+                self.model.datacollector.add_table_row("Lifespan", {
+                    "unique_id": self.unique_id,
+                    "age": self.age
+                })
             else:
                 x, y = self.pos
                 x: int
@@ -51,56 +56,76 @@ class CustomerAgent(Agent):
                     self.model.grid.move_agent(self, (x, y + 1))
                 elif self.model.grid.is_cell_empty((x - 1, y)):
                     self.model.grid.move_agent(self, (x - 1, y))
+                else:
+                    self.maybe_move_somewhere()
+        self.age += 1
 
+    def maybe_move_somewhere(self):
+        self.model: AisleModel
+        move_list = self.model.grid.get_neighborhood(self.pos, False, include_center=True)
+        self.random.shuffle(move_list)
+        for candidate in move_list:
+            if self.model.grid.is_cell_empty(candidate):
+                self.model.grid.move_agent(self, candidate)
 
 
 class AisleModel(Model):
 
     def __init__(
             self,
-            N,
+            n,
             width=11,
             height=4,
+            shelf_config=None,
             probability_table=None,
             spawn_chance=0.3,
             seed=0
     ):
         super().__init__()
         self.grid = SingleGrid(width, height, False)
-        self.num_agents = N
+        self.agents_limit = n
+        self.total_agents = [0, 0, 0, 0]
         self.schedule = RandomActivation(self)
         self.running = True
         self.spawn_chance = spawn_chance
 
         if probability_table is None:
             probability_table = [0.333, 0.333, 0.334]
-        elif sum(probability_table) != 1:
-            return Exception("Probability Table not proper")
+        # elif sum(probability_table) != 1.0:
+        #     return Exception("Probability Table not proper")
         self.probability_table = probability_table
 
         # wall creation
-        wall_config = [0,1,1,1,2,2,2,3,3,3,0]
+        if shelf_config is None:
+            shelf_config = [0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0]
+        self.shelf_config = shelf_config
 
         for i in range(width):
             # wall = WallAgent(None, self, 0)
             # self.grid.position_agent(wall, i, 0)
-            wall = WallAgent(None, self, 0)
+            wall = WallAgent(0, self, 0)
             self.grid.position_agent(wall, i, height - 1)
 
-        for i, target_type in enumerate(wall_config):
-            wall = WallAgent(None, self, target_type)
+        for i, target_type in enumerate(shelf_config):
+            wall = WallAgent(0, self, target_type)
             # self.grid.remove_agent(self.grid.get_cell_list_contents((i, 0)))
             self.grid.position_agent(wall, i, 0)
 
         for i in range(1, height-1):
-            wall = WallAgent(None, self, 0)
+            wall = WallAgent(0, self, 0)
             self.grid.position_agent(wall, width - 1, i)
 
-        self.entrance = [(0, 2)]
-        self.exit = [(0, 1)] + self.entrance
+        self.entrance = [(0, 1)]
+        self.exit = [(0, 2)] + self.entrance
 
         self.datacollector = DataCollector(
-            model_reporters={"population": current_population},
+            model_reporters={
+                "current_population": lambda model: model.schedule.get_agent_count(),
+                "total_population": lambda x: x.total_agents[0],
+                "G1_population": lambda x: x.total_agents[1],
+                "G2_population": lambda x: x.total_agents[2],
+                "G3_population": lambda x: x.total_agents[3],
+            },
             tables={"Lifespan": ["unique_id", "age"]}
         )
 
@@ -116,17 +141,34 @@ class AisleModel(Model):
     def step(self) -> None:
         self.datacollector.collect(self)
         self.schedule.step()
-        if self.random.random() < self.spawn_chance:
-            for potential_entrance in self.exit:
+        if self.total_agents[0] < self.agents_limit and self.random.random() < self.spawn_chance:
+            for potential_entrance in self.entrance:
                 if self.grid.is_cell_empty(potential_entrance):
                     customer = CustomerAgent(self.next_id(), self, self.rand_type())
+                    self.total_agents[0] += 1
+                    self.total_agents[customer.demand] += 1
                     self.grid.position_agent(customer, *potential_entrance)
                     self.schedule.add(customer)
                     break
+        if self.total_agents[0] >= self.agents_limit and self.schedule.get_agent_count() == 0:
+            self.running = False
 
+    def direction_of_shelf(self, pos: Coordinate, demand: int) -> int:
+        shelf_left = self.shelf_config.index(demand)
+        shelf_right = self.list_rindex(demand)
+        x_coord = pos[0]
+        if x_coord < shelf_left:
+            return 1
+        elif shelf_left <= x_coord <= shelf_right:
+            return 1
+        if shelf_right < x_coord:
+            return -1
 
-def current_population(model: AisleModel) -> int:
-    pass
+    def list_rindex(self, x):
+        for i in reversed(range(len(self.shelf_config))):
+            if self.shelf_config[i] == x:
+                return i
+        raise ValueError("{} is not in list".format(x))
 
 
 def main4():
@@ -150,26 +192,25 @@ def main4():
 
     cmap = ListedColormap(['white', 'black', 'red', 'green', 'blue'])
 
-    ax.imshow(grid_point, interpolation="nearest", origin='upper', extent=(0, model.grid.width, 0, model.grid.height), cmap=cmap)
+    ax.imshow(grid_point, interpolation="nearest", origin='upper', extent=(0, model.grid.width, 0, model.grid.height),
+              cmap=cmap)
     # psm = ax.pcolormesh(grid_point, rasterized=True, vmin=-4, vmax=4)
     # fig.colorbar()
     plt.show()
 
 
 def main1():
-    import matplotlib.pyplot as plt
-
     all_wealth = []
     # This runs the model 100 times, each model executing 10 steps.
     for j in range(100):
         # Run the model
-        model = MoneyModel(10)
+        model = AisleModel(10)
         for i in range(10):
             model.step()
 
         # Store the results
         for agent in model.schedule.agents:
-            all_wealth.append(agent.wealth)
+            all_wealth.append(agent.unique_id)
 
     plt.hist(all_wealth, bins=range(max(all_wealth) + 1))
 
@@ -177,7 +218,7 @@ def main1():
 
 
 def main2():
-    model = MoneyModel(50, 10, 10)
+    model = AisleModel(50, 10, 10)
     for i in range(20):
         model.step()
 
@@ -192,7 +233,7 @@ def main2():
 
 
 def main3():
-    model = MoneyModel(50, 10, 10)
+    model = AisleModel(50, 10, 10)
     for i in range(100):
         model.step()
 
