@@ -102,7 +102,7 @@ server = ModularServer(AisleModel,
                                                                  max_value=1,
                                                                  step=0.01),
                            "shelf_config": [0, 3, 3, 3, 1, 1, 1, 2, 2, 2, 0],
-                           "probability_table": [0.7, 0.2, 0.1],
+                           "probability_table": [0.6, 0.2, 0.2],
                            "seed": 0,
                        })
 
