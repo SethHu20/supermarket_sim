@@ -10,7 +10,7 @@ from simulator import AisleModel, WallAgent, CustomerAgent
 
 MODEL_HEIGHT = 4
 
-MODEL_WIDTH = 11
+MODEL_WIDTH = 13
 
 
 def plot_examples(colormaps):
@@ -94,16 +94,18 @@ server = ModularServer(AisleModel,
                        [grid, chart1, chart2],
                        "Supermarket model",
                        {
-                           "n": UserSettableParameter('slider', 'Customer n', value=100, min_value=1, max_value=200,
+                           "n": UserSettableParameter('slider', 'Customer n', value=50, min_value=1, max_value=200,
                                                       step=1),
                            "width": MODEL_WIDTH,
                            "height": MODEL_HEIGHT,
-                           "spawn_chance": UserSettableParameter('slider', 'Spawn Chance', value=0.3, min_value=0,
-                                                                 max_value=1,
-                                                                 step=0.01),
-                           "shelf_config": [0, 3, 3, 3, 1, 1, 1, 2, 2, 2, 0],
-                           "probability_table": [0.6, 0.2, 0.2],
-                           "seed": 0,
+                           "spawn_probability": UserSettableParameter('slider', 'Spawn Chance', value=0.3, min_value=0,
+                                                                      max_value=1,
+                                                                      step=0.01),
+                           "shelf_config": UserSettableParameter('number', 'Shelf config', value=123),
+                           "g1_population": UserSettableParameter('number', 'G1 pop', value=0.5),
+                           "g2_population": UserSettableParameter('number', 'G2 pop', value=0.333),
+                           "g3_population": UserSettableParameter('number', 'G3 pop', value=0.167),
+                           "seed": UserSettableParameter('number', 'seed', value=0),
                        })
 
 server.port = 8521  # The default

@@ -1,10 +1,12 @@
+from typing import Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 from mesa import Agent, Model
 from mesa.datacollection import DataCollector
 from mesa.space import SingleGrid, Coordinate
-from mesa.time import RandomActivation
+from mesa.time import RandomActivation, BaseScheduler
 
 
 class WallAgent(Agent):
@@ -34,10 +36,10 @@ class CustomerAgent(Agent):
             y: int
             if self.demand != 0:
                 direction = self.model.direction_of_shelf(self.pos, self.demand)
-                if self.model.grid.is_cell_empty((x, y-1)):
-                    self.model.grid.move_agent(self, (x, y-1))
-                elif self.model.grid.is_cell_empty((x+direction, y)):
-                    self.model.grid.move_agent(self, (x+direction, y))
+                if self.model.grid.is_cell_empty((x, y - 1)):
+                    self.model.grid.move_agent(self, (x, y - 1))
+                elif self.model.grid.is_cell_empty((x + direction, y)):
+                    self.model.grid.move_agent(self, (x + direction, y))
                 else:
                     self.maybe_move_somewhere()
         elif self.demand == 0:
@@ -62,6 +64,9 @@ class CustomerAgent(Agent):
 
     def maybe_move_somewhere(self):
         self.model: AisleModel
+        if self.pos in self.model.exit:
+            return
+        self.model: AisleModel
         move_list = self.model.grid.get_neighborhood(self.pos, False, include_center=True)
         self.random.shuffle(move_list)
         for candidate in move_list:
@@ -73,13 +78,15 @@ class AisleModel(Model):
 
     def __init__(
             self,
-            n,
-            width=11,
-            height=4,
-            shelf_config=None,
-            probability_table=None,
-            spawn_chance=0.3,
-            seed=0
+            n: int = 100,
+            width: int = 14,
+            height: int = 4,
+            shelf_config: Union[None, str, int] = None,
+            g1_population: float = 0.334,
+            g2_population: float = 0.333,
+            g3_population: float = 0.333,
+            spawn_probability: float = 0.3,
+            seed: int = 0
     ):
         super().__init__()
         self.grid = SingleGrid(width, height, False)
@@ -87,18 +94,22 @@ class AisleModel(Model):
         self.total_agents = [0, 0, 0, 0]
         self.schedule = RandomActivation(self)
         self.running = True
-        self.spawn_chance = spawn_chance
+        self.spawn_chance = spawn_probability
 
-        if probability_table is None:
-            probability_table = [0.333, 0.333, 0.334]
-        # elif sum(probability_table) != 1.0:
+        self.probability_table = [g1_population, g2_population, g3_population]
+        # if sum(self.probability_table) < 1.0:
         #     return Exception("Probability Table not proper")
-        self.probability_table = probability_table
 
         # wall creation
         if shelf_config is None:
-            shelf_config = [0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0]
-        self.shelf_config = shelf_config
+            self.shelf_config = [0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0]
+        else:
+            shelf_config = str(shelf_config)
+            assert len(shelf_config) == 3
+            self.shelf_config = [0] * (width - 10)
+            for n in shelf_config:
+                self.shelf_config.extend([int(n)] * 3)
+            self.shelf_config.append(0)
 
         for i in range(width):
             # wall = WallAgent(None, self, 0)
@@ -106,12 +117,12 @@ class AisleModel(Model):
             wall = WallAgent(0, self, 0)
             self.grid.position_agent(wall, i, height - 1)
 
-        for i, target_type in enumerate(shelf_config):
+        for i, target_type in enumerate(self.shelf_config):
             wall = WallAgent(0, self, target_type)
             # self.grid.remove_agent(self.grid.get_cell_list_contents((i, 0)))
             self.grid.position_agent(wall, i, 0)
 
-        for i in range(1, height-1):
+        for i in range(1, height - 1):
             wall = WallAgent(0, self, 0)
             self.grid.position_agent(wall, width - 1, i)
 
@@ -151,7 +162,9 @@ class AisleModel(Model):
                     self.schedule.add(customer)
                     break
         if self.total_agents[0] >= self.agents_limit and self.schedule.get_agent_count() == 0:
+            self.datacollector.collect(self)
             self.running = False
+
 
     def direction_of_shelf(self, pos: Coordinate, demand: int) -> int:
         shelf_left = self.shelf_config.index(demand)
