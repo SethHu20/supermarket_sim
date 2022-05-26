@@ -1,7 +1,7 @@
 from typing import Union
 
-import matplotlib.pyplot as plt
-import numpy as np
+# import matplotlib.pyplot as plt
+# import numpy as np
 from matplotlib.colors import ListedColormap
 from mesa import Agent, Model
 from mesa.datacollection import DataCollector
@@ -184,75 +184,75 @@ class AisleModel(Model):
         raise ValueError("{} is not in list".format(x))
 
 
-def main4():
-    model = AisleModel(10)
-
-    grid_point = np.zeros((model.grid.width, model.grid.height))
-
-    for cell, x, y in model.grid.coord_iter():
-        if isinstance(cell, WallAgent):
-            cell: WallAgent
-            grid_point[x][y] = cell.type
-        else:
-            grid_point[x][y] = -1
-
-    grid_point = grid_point.transpose()
-
-    fig, ax = plt.subplots()
-
-    ax.set_xticks(np.arange(model.grid.width), minor=False)
-    ax.set_yticks(np.arange(model.grid.height), minor=False)
-
-    cmap = ListedColormap(['white', 'black', 'red', 'green', 'blue'])
-
-    ax.imshow(grid_point, interpolation="nearest", origin='upper', extent=(0, model.grid.width, 0, model.grid.height),
-              cmap=cmap)
-    # psm = ax.pcolormesh(grid_point, rasterized=True, vmin=-4, vmax=4)
-    # fig.colorbar()
-    plt.show()
-
-
-def main1():
-    all_wealth = []
-    # This runs the model 100 times, each model executing 10 steps.
-    for j in range(100):
-        # Run the model
-        model = AisleModel(10)
-        for i in range(10):
-            model.step()
-
-        # Store the results
-        for agent in model.schedule.agents:
-            all_wealth.append(agent.unique_id)
-
-    plt.hist(all_wealth, bins=range(max(all_wealth) + 1))
-
-    plt.show()
-
-
-def main2():
-    model = AisleModel(50, 10, 10)
-    for i in range(20):
-        model.step()
-
-    agent_counts = np.zeros((model.grid.width, model.grid.height))
-    for cell in model.grid.coord_iter():
-        cell_content, x, y = cell
-        agent_count = len(cell_content)
-        agent_counts[x][y] = agent_count
-    plt.imshow(agent_counts, interpolation="nearest")
-    plt.colorbar()
-    plt.show()
-
-
-def main3():
-    model = AisleModel(50, 10, 10)
-    for i in range(100):
-        model.step()
-
-    gini = model.datacollector.get_model_vars_dataframe()
-    gini.head()
-
-
-if __name__ == '__main__':
-    main4()
+# def main4():
+#     model = AisleModel(10)
+#
+#     grid_point = np.zeros((model.grid.width, model.grid.height))
+#
+#     for cell, x, y in model.grid.coord_iter():
+#         if isinstance(cell, WallAgent):
+#             cell: WallAgent
+#             grid_point[x][y] = cell.type
+#         else:
+#             grid_point[x][y] = -1
+#
+#     grid_point = grid_point.transpose()
+#
+#     fig, ax = plt.subplots()
+#
+#     ax.set_xticks(np.arange(model.grid.width), minor=False)
+#     ax.set_yticks(np.arange(model.grid.height), minor=False)
+#
+#     cmap = ListedColormap(['white', 'black', 'red', 'green', 'blue'])
+#
+#     ax.imshow(grid_point, interpolation="nearest", origin='upper', extent=(0, model.grid.width, 0, model.grid.height),
+#               cmap=cmap)
+#     # psm = ax.pcolormesh(grid_point, rasterized=True, vmin=-4, vmax=4)
+#     # fig.colorbar()
+#     plt.show()
+#
+#
+# def main1():
+#     all_wealth = []
+#     # This runs the model 100 times, each model executing 10 steps.
+#     for j in range(100):
+#         # Run the model
+#         model = AisleModel(10)
+#         for i in range(10):
+#             model.step()
+#
+#         # Store the results
+#         for agent in model.schedule.agents:
+#             all_wealth.append(agent.unique_id)
+#
+#     plt.hist(all_wealth, bins=range(max(all_wealth) + 1))
+#
+#     plt.show()
+#
+#
+# def main2():
+#     model = AisleModel(50, 10, 10)
+#     for i in range(20):
+#         model.step()
+#
+#     agent_counts = np.zeros((model.grid.width, model.grid.height))
+#     for cell in model.grid.coord_iter():
+#         cell_content, x, y = cell
+#         agent_count = len(cell_content)
+#         agent_counts[x][y] = agent_count
+#     plt.imshow(agent_counts, interpolation="nearest")
+#     plt.colorbar()
+#     plt.show()
+#
+#
+# def main3():
+#     model = AisleModel(50, 10, 10)
+#     for i in range(100):
+#         model.step()
+#
+#     gini = model.datacollector.get_model_vars_dataframe()
+#     gini.head()
+#
+#
+# if __name__ == '__main__':
+#     main4()
